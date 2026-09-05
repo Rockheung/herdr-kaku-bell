@@ -108,33 +108,42 @@ def cmd_watch(argv):
     baselined = set()
     log(f"watch 시작 (interval={interval}s)")
     while True:
-        targets = clients()
-        with ThreadPoolExecutor(max_workers=8) as ex:
-            futures = {t: ex.submit(agent_list, t) for t in targets}
-            for t, fut in futures.items():
-                try:
-                    cur = needy(fut.result())
-                except Exception as e:
-                    # 조회 실패는 "아무것도 없음"이 아니다. 상태를 그대로 두어야
-                    # 재연결 직후 가짜 알림이 나가지 않는다.
-                    log(f"{t}: {e}")
-                    continue
-                if t not in baselined:
-                    baselined.add(t)
-                    prev[t] = cur
-                    continue
-                fresh = cur - prev[t]
-                if fresh:
-                    try:
-                        ring(targets[t])
-                        log(f"{t}: ring /dev/{targets[t]} {sorted(fresh)}")
-                    except OSError as e:
-                        log(f"{t}: /dev/{targets[t]} 에 쓸 수 없다 ({e})")
-                prev[t] = cur
-        for gone in set(prev) - set(targets):
-            prev.pop(gone, None)
-            baselined.discard(gone)
+        try:
+            tick(prev, baselined)
+        except Exception as e:
+            # 한 주기가 어떻게 실패하든 감시자는 살아 있어야 한다. 죽으면 알림이
+            # 그냥 오지 않고, 그 사실을 알 방법도 없다.
+            log(f"주기 실패: {type(e).__name__}: {e}")
         time.sleep(interval)
+
+
+def tick(prev, baselined):
+    targets = clients()
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        futures = {t: ex.submit(agent_list, t) for t in targets}
+        for t, fut in futures.items():
+            try:
+                cur = needy(fut.result())
+            except Exception as e:
+                # 조회 실패는 "아무것도 없음"이 아니다. 상태를 그대로 두어야
+                # 재연결 직후 가짜 알림이 나가지 않는다.
+                log(f"{t}: {e}")
+                continue
+            if t not in baselined:
+                baselined.add(t)
+                prev[t] = cur
+                continue
+            fresh = cur - prev[t]
+            if fresh:
+                try:
+                    ring(targets[t])
+                    log(f"{t}: ring /dev/{targets[t]} {sorted(fresh)}")
+                except OSError as e:
+                    log(f"{t}: /dev/{targets[t]} 에 쓸 수 없다 ({e})")
+            prev[t] = cur
+    for gone in set(prev) - set(targets):
+        prev.pop(gone, None)
+        baselined.discard(gone)
 
 
 def main():
