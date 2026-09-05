@@ -1,0 +1,17 @@
+id = "rockheung.kaku-bell"
+name = "Kaku Tab Bell"
+version = "0.1.0"
+min_herdr_version = "0.8.0"
+description = "에이전트가 손을 기다릴 때 kaku 탭에 점을 켠다"
+platforms = ["macos"]
+
+# 서버가 뜰 때 감시자를 띄운다. 감시자는 로컬과 원격 herdr 세션의 에이전트 상태를
+# 확인해서, 손이 필요한 상태로 바뀌면 그 세션이 붙어 있는 kaku 탭 tty 에 BEL 을 쓴다.
+[[startup]]
+command = ["bin/kaku-bell", "watch", "--daemon"]
+
+# herdr 0.8.2 에서는 이 훅이 붙지 않는 것으로 관찰됐다. 상위 버전에서 살아나면
+# 감시자보다 먼저 반응한다. 감시자와 중복돼도 BEL 이 두 번 갈 뿐 표식은 하나다.
+[[events]]
+on = "pane.agent_status_changed"
+command = ["bin/kaku-bell", "ring", "--local"]

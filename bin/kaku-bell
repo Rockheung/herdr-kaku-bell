@@ -1,0 +1,155 @@
+#!/usr/bin/env python3
+"""에이전트가 손을 기다릴 때 kaku 탭에 점을 켠다.
+
+kaku 는 BEL 을 받은 탭에 표식을 그리고 그 탭을 열면 지운다. herdr 도 알림에 bell 을
+쏘지만 포그라운드 클라이언트에만 보내서, 정작 표식이 필요한 배경 탭에는 오지 않는다.
+그래서 각 herdr 클라이언트가 점유한 tty 를 찾아 밖에서 BEL 을 써 넣는다.
+"""
+import json
+import os
+import subprocess
+import sys
+import time
+from concurrent.futures import ThreadPoolExecutor
+
+NEEDY = {"blocked", "done"}
+STATE = "/tmp/herdr-kaku-bell"
+PIDFILE = os.path.join(STATE, "watch.pid")
+LOGFILE = os.path.join(STATE, "watch.log")
+# ControlPath 는 유닉스 소켓이라 104바이트 제한이 있다. macOS 의 TMPDIR 은 그것만으로
+# 한도를 넘기므로 /tmp 에 두고, %C 해시로 길이를 고정한다.
+SSH = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5",
+       "-o", "ControlMaster=auto", "-o", "ControlPath=/tmp/.hkb-%C",
+       "-o", "ControlPersist=300"]
+REMOTE_CMD = 'H=$(command -v herdr 2>/dev/null || echo "$HOME/.local/bin/herdr"); exec "$H" agent list'
+
+
+def log(msg):
+    os.makedirs(STATE, exist_ok=True)
+    with open(LOGFILE, "a") as f:
+        f.write(f"{time.strftime('%F %T')} {msg}\n")
+
+
+def clients():
+    """{target: tty}. target 은 'local' 또는 ssh 대상.
+
+    herdr 클라이언트 프로세스만 센다. 자식 ssh 도 같은 tty 를 쓰고 명령줄에 ssh://
+    를 담고 있어서, argv[0] 과 --remote 위치를 함께 봐야 오귀속을 막는다.
+    """
+    out = subprocess.run(["ps", "-axo", "tty=,command="],
+                         capture_output=True, text=True).stdout
+    found = {}
+    for line in out.splitlines():
+        parts = line.split()
+        if len(parts) < 2 or not parts[0].startswith("tty"):
+            continue
+        tty, argv = parts[0], parts[1:]
+        if os.path.basename(argv[0]) != "herdr":
+            continue
+        if len(argv) >= 3 and argv[1] == "--remote" and argv[2].startswith("ssh://"):
+            found.setdefault(argv[2][len("ssh://"):], tty)
+        elif len(argv) == 1:
+            found.setdefault("local", tty)
+    return found
+
+
+def agent_list(target):
+    if target == "local":
+        cmd = ["herdr", "agent", "list"]
+    else:
+        cmd = SSH + [target, REMOTE_CMD]
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=25)
+    if r.returncode != 0:
+        raise RuntimeError((r.stderr or r.stdout).strip()[:200] or f"exit {r.returncode}")
+    return json.loads(r.stdout)["result"]["agents"]
+
+
+def needy(agents):
+    return {a["pane_id"] for a in agents if a.get("agent_status") in NEEDY}
+
+
+def ring(tty):
+    with open(f"/dev/{tty}", "w") as f:
+        f.write("\a")
+
+
+def cmd_ring(argv):
+    target = argv[0] if argv else "--local"
+    if target == "--local":
+        target = "local"
+    tty = clients().get(target)
+    if not tty:
+        sys.exit(f"ring: {target} 에 붙은 탭을 찾지 못했다")
+    try:
+        ring(tty)
+    except OSError as e:
+        sys.exit(f"ring: /dev/{tty} 에 쓸 수 없다 ({e})")
+
+
+def cmd_watch(argv):
+    if "--daemon" in argv:
+        os.makedirs(STATE, exist_ok=True)
+        if os.path.exists(PIDFILE):
+            try:
+                os.kill(int(open(PIDFILE).read()), 0)
+                print(f"watch: 이미 실행 중 (pid {open(PIDFILE).read().strip()})")
+                return
+            except (OSError, ValueError):
+                pass
+        with open(LOGFILE, "a") as out:
+            p = subprocess.Popen([sys.executable, os.path.abspath(__file__), "watch"],
+                                 stdout=out, stderr=out, start_new_session=True)
+        open(PIDFILE, "w").write(str(p.pid))
+        print(f"watch: 시작 (pid {p.pid})")
+        return
+
+    interval = float(os.environ.get("HERDR_KAKU_BELL_INTERVAL", "5"))
+    prev = {}      # target -> 손이 필요한 pane_id 집합
+    baselined = set()
+    log(f"watch 시작 (interval={interval}s)")
+    while True:
+        targets = clients()
+        with ThreadPoolExecutor(max_workers=8) as ex:
+            futures = {t: ex.submit(agent_list, t) for t in targets}
+            for t, fut in futures.items():
+                try:
+                    cur = needy(fut.result())
+                except Exception as e:
+                    # 조회 실패는 "아무것도 없음"이 아니다. 상태를 그대로 두어야
+                    # 재연결 직후 가짜 알림이 나가지 않는다.
+                    log(f"{t}: {e}")
+                    continue
+                if t not in baselined:
+                    baselined.add(t)
+                    prev[t] = cur
+                    continue
+                fresh = cur - prev[t]
+                if fresh:
+                    try:
+                        ring(targets[t])
+                        log(f"{t}: ring /dev/{targets[t]} {sorted(fresh)}")
+                    except OSError as e:
+                        log(f"{t}: /dev/{targets[t]} 에 쓸 수 없다 ({e})")
+                prev[t] = cur
+        for gone in set(prev) - set(targets):
+            prev.pop(gone, None)
+            baselined.discard(gone)
+        time.sleep(interval)
+
+
+def main():
+    argv = sys.argv[1:]
+    if not argv or argv[0] in ("-h", "--help"):
+        sys.exit(__doc__ + "\n사용법: kaku-bell ring [--local|<ssh-target>]\n"
+                           "        kaku-bell watch [--daemon]")
+    sub, rest = argv[0], argv[1:]
+    if sub == "ring":
+        cmd_ring(rest)
+    elif sub == "watch":
+        cmd_watch(rest)
+    else:
+        sys.exit(f"모르는 명령: {sub}")
+
+
+if __name__ == "__main__":
+    main()
