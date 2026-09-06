@@ -106,7 +106,10 @@ def cmd_watch(argv):
         print(f"watch: 시작 (pid {p.pid})")
         return
 
-    interval = float(os.environ.get("HERDR_KAKU_BELL_INTERVAL", "5"))
+    # 7대를 병렬로 조회하는 데 0.2초가 걸린다(ssh ControlMaster 로 연결 재사용).
+    # 5초를 기다릴 이유가 없어 1초로 둔다. 조회가 주기보다 오래 걸리면 다음
+    # 주기가 그만큼 밀릴 뿐 망가지지는 않는다.
+    interval = float(os.environ.get("HERDR_KAKU_BELL_INTERVAL", "1"))
     prev = {}      # target -> 손이 필요한 pane_id 집합
     baselined = set()
     log(f"watch 시작 (interval={interval}s)")
