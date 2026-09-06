@@ -126,7 +126,11 @@ herdr() { TERM_PROGRAM=WezTerm command herdr "$@"; }
 
 | 환경변수 | 기본값 | 뜻 |
 |---|---|---|
-| `HERDR_KAKU_BELL_INTERVAL` | `5` | 폴링 주기(초) |
+| `HERDR_KAKU_BELL_INTERVAL` | `1` | 폴링 주기(초). 소수도 받는다 |
+
+세션 일곱 개를 병렬로 조회하는 데 0.2초쯤 걸린다. 주기를 줄여도 부담이 크지 않아
+`0.5` 까지 내려도 동작하지만, 서버가 많거나 회선이 느리면 조회가 주기를 넘어선다.
+그때는 다음 주기가 그만큼 밀릴 뿐 망가지지는 않는다.
 
 상태와 로그는 `/tmp/herdr-kaku-bell/` 에 있다. `watch.log` 에 ssh 오류가 쌓인다.
 
