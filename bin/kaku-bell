@@ -46,14 +46,11 @@ def clients():
         tty, argv = parts[0], parts[1:]
         if os.path.basename(argv[0]) != "herdr":
             continue
-        if len(argv) >= 3 and argv[1] == "--remote":
-            # --remote 는 ssh:// 접두사가 있든 없든 받는다. 붙여 띄운 탭과 빼고 띄운
-            # 탭이 같은 대상으로 모이도록 여기서 벗겨 둔다.
-            target = argv[2]
-            if target.startswith("ssh://"):
-                target = target[len("ssh://"):]
-            if target:
-                found.setdefault(target, tty)
+        if len(argv) >= 3 and argv[1] == "--remote" and argv[2]:
+            # herdr 는 --remote 값을 파싱하지 않고 ssh 에 그대로 넘긴다. ssh config
+            # 별칭, user@host, ssh:// URI, 포트가 붙은 형태가 모두 온다. 여기서도
+            # 손대지 않고 그대로 써야 포트나 IPv6 표기가 깨지지 않는다.
+            found.setdefault(argv[2], tty)
         elif len(argv) == 1:
             found.setdefault("local", tty)
     return found
