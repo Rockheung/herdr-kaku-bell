@@ -73,9 +73,11 @@ kaku 문서에는 나오지 않는 설정이라 모르고 지나치기 쉽다. �
 delivery = "system"
 ```
 
-`delivery = "terminal"` 은 kitty 알림 프로토콜(OSC 99)만 보내는데 kaku 는 그것을
-읽지 않는다. herdr 는 그래도 `shown: true` 를 돌려주므로, 설정만 보고 동작한다고
-판단하면 안 된다.
+`delivery = "terminal"` 은 쓰지 않는다. herdr 는 `TERM_PROGRAM` 과 `TERM` 으로 바깥
+터미널을 판별해 알림 시퀀스를 고르는데, kaku 는 자기 이름으로 정체를 알리기 때문에
+(`TERM_PROGRAM=Kaku`, `TERM=xterm-256color`) 어느 갈래에도 걸리지 않는다. 그러면 herdr
+는 아무 시퀀스도 내보내지 않으면서 `shown: true` 를 돌려주므로, 응답만 보고 동작한다고
+판단하면 안 된다. ([herdrdev/herdr#2513](https://github.com/herdrdev/herdr/issues/2513))
 
 ## 설정
 
