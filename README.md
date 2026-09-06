@@ -64,20 +64,37 @@ kaku 문서에는 나오지 않는 설정이라 모르고 지나치기 쉽다. �
 
 ## herdr 쪽 권장 설정
 
-탭 표식은 어느 세션인지만 알려준다. 무슨 일인지까지 알고 싶으면 herdr 의 알림을 함께
-켠다. `blocked` 는 `claude needs attention`, `done` 은 `claude finished` 로 구분해서
-띄운다.
+이 플러그인은 탭 표식만 담당한다. 표식은 어느 세션인지까지만 알려주므로, 무슨 일인지
+알려면 herdr 의 알림을 함께 켠다. `blocked` 는 `claude needs attention`, `done` 은
+`claude finished` 로 구분해서 띄운다.
 
 ```toml
 [ui.toast]
-delivery = "system"
+delivery = "terminal"
 ```
 
-`delivery = "terminal"` 은 쓰지 않는다. herdr 는 `TERM_PROGRAM` 과 `TERM` 으로 바깥
-터미널을 판별해 알림 시퀀스를 고르는데, kaku 는 자기 이름으로 정체를 알리기 때문에
-(`TERM_PROGRAM=Kaku`, `TERM=xterm-256color`) 어느 갈래에도 걸리지 않는다. 그러면 herdr
-는 아무 시퀀스도 내보내지 않으면서 `shown: true` 를 돌려주므로, 응답만 보고 동작한다고
-판단하면 안 된다. ([herdrdev/herdr#2513](https://github.com/herdrdev/herdr/issues/2513))
+**kaku 에서는 여기에 한 가지가 더 필요하다.** herdr 는 `TERM_PROGRAM` 과 `TERM` 으로
+바깥 터미널을 판별해 알림 시퀀스를 고르는데, kaku 는 WezTerm 포크이면서도 자기 이름으로
+정체를 알리기 때문에(`TERM_PROGRAM=Kaku`, `TERM=xterm-256color`) 어느 갈래에도 걸리지
+않는다. 그러면 herdr 는 아무 시퀀스도 내보내지 않으면서 `shown: true` 를 돌려준다.
+응답만 보고 동작한다고 판단하면 안 된다.
+([herdrdev/herdr#2513](https://github.com/herdrdev/herdr/issues/2513))
+
+kaku 는 OSC 9 를 읽으므로, herdr 에게 WezTerm 계열이라고 알리면 실제 능력과 일치한다.
+herdr 를 띄울 때만 걸어서 영향을 그 프로세스에 가둔다.
+
+```sh
+# ~/.zshrc.local
+herdr() { TERM_PROGRAM=WezTerm command herdr "$@"; }
+```
+
+환경변수는 프로세스가 시작할 때 읽히므로, 이미 떠 있는 클라이언트는 다시 띄워야 한다.
+`herdr --remote` 로 여러 서버에 붙어 있다면 탭마다 해야 한다.
+
+이 방법을 쓰면 알림이 kaku 아이콘으로 뜨는 대신, OSC 9 규격상 제목과 본문이 한 줄로
+합쳐진다. 알림 제목 자리에는 `Kaku` 가 들어가고 `claude needs attention: ~ · 1` 이
+본문이 된다. 제목에서 상태를 바로 읽고 싶으면 `delivery = "system"` 을 쓴다 — 그쪽은
+`osascript` 를 거치므로 알림이 "스크립트 편집기" 이름으로 뜬다.
 
 ## 설정
 
