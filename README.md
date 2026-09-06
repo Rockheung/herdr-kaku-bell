@@ -49,6 +49,34 @@ bin/kaku-bell watch --daemon
 - 대상 목록은 매 주기 `ps` 에서 다시 만든다. 재연결로 tty 가 바뀌거나 세션이 늘고
   줄어도 따라간다. 원격 조회는 ssh `ControlMaster` 로 연결을 재사용한다.
 
+## kaku 쪽 권장 설정
+
+탭 점은 `bell_tab_indicator` 로 기본 활성이라 따로 켤 것이 없다. 다만 **Dock 배지는
+기본이 꺼져 있다.** kaku 를 다른 앱 뒤로 보내 두었을 때도 몇 건이 밀려 있는지 보려면
+`~/.config/kaku/kaku.lua` 에 한 줄을 넣는다.
+
+```lua
+config.bell_dock_badge = true
+```
+
+kaku 문서에는 나오지 않는 설정이라 모르고 지나치기 쉽다. 배지는 kaku 창이 포커스를
+받거나 탭을 전환하면 지워진다.
+
+## herdr 쪽 권장 설정
+
+탭 표식은 어느 세션인지만 알려준다. 무슨 일인지까지 알고 싶으면 herdr 의 알림을 함께
+켠다. `blocked` 는 `claude needs attention`, `done` 은 `claude finished` 로 구분해서
+띄운다.
+
+```toml
+[ui.toast]
+delivery = "system"
+```
+
+`delivery = "terminal"` 은 kitty 알림 프로토콜(OSC 99)만 보내는데 kaku 는 그것을
+읽지 않는다. herdr 는 그래도 `shown: true` 를 돌려주므로, 설정만 보고 동작한다고
+판단하면 안 된다.
+
 ## 설정
 
 | 환경변수 | 기본값 | 뜻 |
