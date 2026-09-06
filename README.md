@@ -2,12 +2,38 @@
 
 에이전트가 손을 기다릴 때 [kaku](https://github.com/tw93/Kaku) 탭에 점을 켠다.
 
+**[herdr](https://github.com/herdrdev/herdr) 플러그인이다.** kaku 에는 아무것도 설치하지
+않는다. 다만 표식을 그리는 쪽이 kaku 이므로, kaku 를 바깥 터미널로 쓸 때만 의미가 있다.
+
+## 무엇이 필요한가
+
+| | | |
+|---|---|---|
+| herdr | 0.8.0 이상 | 이 플러그인을 설치하는 곳 |
+| kaku | — | 표식을 그리는 곳. 바깥 터미널이어야 한다 |
+| macOS | — | `ps` 출력과 `/dev/ttysNNN` 쓰기에 기댄다 |
+
+kaku 쪽은 설치가 아니라 설정 두 가지를 확인하면 된다. 자세한 내용은 아래
+[kaku 쪽 권장 설정](#kaku-쪽-권장-설정)에 있다.
+
+- `bell_tab_indicator` — 탭 점. **기본으로 켜져 있다.** 명시적으로 `false` 로 두지
+  않았다면 손댈 것이 없다.
+- `bell_dock_badge` — Dock 배지. **기본으로 꺼져 있다.** kaku 를 다른 앱 뒤에 두고
+  일한다면 켜는 편이 낫다.
+
+herdr 의 알림까지 함께 쓰려면 [herdr 쪽 권장 설정](#herdr-쪽-권장-설정)도 본다. kaku 에서는
+설정 한 줄로 끝나지 않고 herdr 에게 터미널 정체를 다르게 알려야 한다.
+
 ## 왜 필요한가
 
 kaku 는 BEL 을 받은 탭에 주황 점을 그리고, 그 탭을 열면 지운다. 완료 신호로 쓰라고
-만들어진 기능이다. herdr 도 알림과 함께 bell 을 쏜다. 그런데 herdr 는 **포그라운드
-클라이언트에만** bell 을 보낸다(`dropped terminal bell without a foreground client`).
-정작 표식이 필요한 배경 탭에는 오지 않는다.
+만들어진 기능이다.
+
+그런데 herdr 는 에이전트가 `blocked` 나 `done` 으로 바뀔 때 알림(toast)만 보내고 BEL 은
+쏘지 않는다. herdr 가 바깥 터미널로 내보내는 `TerminalBell` 은 pane 안 프로그램이 실제로
+BEL 을 출력했을 때만 생기고, 그것도 포커스된 pane 의 것만
+나간다([herdrdev/herdr#3095](https://github.com/herdrdev/herdr/issues/3095)). 정작 표식이
+필요한 배경 탭은 조용하다.
 
 `herdr --remote` 로 여러 서버에 붙어 있으면 이 문제가 커진다. 어느 서버의 에이전트가
 멈춰 서서 답을 기다리는지 탭만 봐서는 알 수 없다.
