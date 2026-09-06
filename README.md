@@ -1,147 +1,171 @@
 # herdr-kaku-bell
 
-에이전트가 손을 기다릴 때 [kaku](https://github.com/tw93/Kaku) 탭에 점을 켠다.
+English · [한국어](README.ko.md)
 
-**[herdr](https://github.com/herdrdev/herdr) 플러그인이다.** kaku 에는 아무것도 설치하지
-않는다. 다만 표식을 그리는 쪽이 kaku 이므로, kaku 를 바깥 터미널로 쓸 때만 의미가 있다.
+Lights up a [kaku](https://github.com/tw93/Kaku) tab when an agent is waiting on you.
 
-## 무엇이 필요한가
+**This is a [herdr](https://github.com/herdrdev/herdr) plugin.** Nothing is installed into
+kaku. But kaku is what draws the indicator, so this only makes sense when kaku is your
+outer terminal.
+
+## What it needs
 
 | | | |
 |---|---|---|
-| herdr | 0.8.0 이상 | 이 플러그인을 설치하는 곳 |
-| kaku | — | 표식을 그리는 곳. 바깥 터미널이어야 한다 |
-| macOS | — | `ps` 출력과 `/dev/ttysNNN` 쓰기에 기댄다 |
+| herdr | 0.8.0 or newer | where the plugin is installed |
+| kaku | — | where the indicator is drawn; must be the outer terminal |
+| macOS | — | relies on `ps` output and writing to `/dev/ttysNNN` |
 
-kaku 쪽은 설치가 아니라 설정 두 가지를 확인하면 된다. 자세한 내용은 아래
-[kaku 쪽 권장 설정](#kaku-쪽-권장-설정)에 있다.
+On the kaku side there is nothing to install, only two settings worth checking. Details in
+[Recommended kaku settings](#recommended-kaku-settings).
 
-- `bell_tab_indicator` — 탭 점. **기본으로 켜져 있다.** 명시적으로 `false` 로 두지
-  않았다면 손댈 것이 없다.
-- `bell_dock_badge` — Dock 배지. **기본으로 꺼져 있다.** kaku 를 다른 앱 뒤에 두고
-  일한다면 켜는 편이 낫다.
+- `bell_tab_indicator` — the tab dot. **On by default.** Nothing to do unless you have
+  explicitly set it to `false`.
+- `bell_dock_badge` — the Dock badge. **Off by default.** Worth turning on if you keep
+  kaku behind other apps.
 
-herdr 의 알림까지 함께 쓰려면 [herdr 쪽 권장 설정](#herdr-쪽-권장-설정)도 본다. kaku 에서는
-설정 한 줄로 끝나지 않고 herdr 에게 터미널 정체를 다르게 알려야 한다.
+To also get herdr's notifications, see
+[Recommended herdr settings](#recommended-herdr-settings). On kaku that takes more than one
+config line: herdr has to be told what the terminal is.
 
-## 왜 필요한가
+## Why it is needed
 
-kaku 는 BEL 을 받은 탭에 주황 점을 그리고, 그 탭을 열면 지운다. 완료 신호로 쓰라고
-만들어진 기능이다.
+kaku draws an orange dot on a tab that receives a BEL, and clears it when you open that tab.
+The feature exists to be used as a completion signal.
 
-그런데 herdr 는 에이전트가 `blocked` 나 `done` 으로 바뀔 때 알림(toast)만 보내고 BEL 은
-쏘지 않는다. herdr 가 바깥 터미널로 내보내는 `TerminalBell` 은 pane 안 프로그램이 실제로
-BEL 을 출력했을 때만 생기고, 그것도 포커스된 pane 의 것만
-나간다([herdrdev/herdr#3095](https://github.com/herdrdev/herdr/issues/3095)). 정작 표식이
-필요한 배경 탭은 조용하다.
+herdr, however, only sends a toast when an agent turns `blocked` or `done` — it does not
+emit a BEL. The `TerminalBell` that herdr forwards to the outer terminal is produced only
+when a program inside a pane actually writes a BEL, and even then only the focused pane's
+bell gets through ([herdrdev/herdr#3095](https://github.com/herdrdev/herdr/issues/3095)).
+The background tabs — the ones that actually need the indicator — stay silent.
 
-`herdr --remote` 로 여러 서버에 붙어 있으면 이 문제가 커진다. 어느 서버의 에이전트가
-멈춰 서서 답을 기다리는지 탭만 봐서는 알 수 없다.
+The problem grows with `herdr --remote` across several servers. Nothing in the tab bar tells
+you which server has an agent standing still, waiting for an answer.
 
-이 플러그인은 밖에서 BEL 을 쓴다. 각 herdr 클라이언트가 점유한 tty 를 `ps` 로 찾아
-`\a` 를 직접 써 넣는다.
+This plugin writes the BEL from outside. It finds the tty each herdr client occupies via
+`ps` and writes `\a` into it directly.
 
-## 설치
+## Install
 
 ```sh
-herdr plugin link /path/to/herdr-kaku-bell
+herdr plugin install Rockheung/herdr-kaku-bell
 ```
 
-`[[startup]]` 훅이 herdr 서버 기동 시 감시자를 띄운다. 서버를 재시작하지 않고 지금
-바로 쓰려면 직접 실행한다.
+The `[[startup]]` hook launches the watcher when the herdr server starts. To use it now
+without restarting the server, run it yourself:
 
 ```sh
 bin/kaku-bell watch --daemon
 ```
 
-## 구성
+For local development, link the working directory instead:
 
-- `bin/kaku-bell ring [--local|<ssh-target>]` — 해당 herdr 세션이 붙어 있는 kaku 탭에
-  BEL 을 쓴다.
-- `bin/kaku-bell watch [--daemon]` — 로컬과 원격 세션을 지켜보다가 `blocked`·`done`
-  이 **새로** 생기면 그 탭에 BEL 을 보낸다.
+```sh
+herdr plugin link /path/to/herdr-kaku-bell
+```
 
-설계에서 신경 쓴 것들이다.
+## How it works
 
-- **대상 판별**: 자식 `ssh` 프로세스도 같은 tty 를 쓰고 명령줄에 `ssh://target` 을
-  담고 있다. `argv[0]` 이 `herdr` 이고 `argv[1]` 이 `--remote` 인 것만 센다.
-- **JSON**: `agent list` 응답을 파서로 읽는다. 에이전트 제목에는 사용자가 친 프롬프트가
-  들어가므로 중괄호나 따옴표를 텍스트로 긁으면 깨진다.
-- **조회 실패**: "아무것도 없음"으로 취급하지 않는다. 상태를 그대로 두어서, 네트워크가
-  끊겼다 붙을 때 가짜 알림이 나가지 않는다.
-- **첫 주기**: 상태만 기록하고 울리지 않는다. 감시자를 켤 때마다 이미 멈춰 있던
-  에이전트들이 한꺼번에 울리지 않는다.
-- **병렬 조회**: 세션마다 스레드를 쓴다. 한 대가 타임아웃에 걸려도 주기가 밀리지 않는다.
-- 대상 목록은 매 주기 `ps` 에서 다시 만든다. 재연결로 tty 가 바뀌거나 세션이 늘고
-  줄어도 따라간다. 원격 조회는 ssh `ControlMaster` 로 연결을 재사용한다.
+- `bin/kaku-bell ring [--local|<ssh-target>]` — writes a BEL to the kaku tab that hosts the
+  given herdr session.
+- `bin/kaku-bell watch [--daemon]` — watches local and remote sessions and rings the tab
+  when `blocked` or `done` **newly** appears.
 
-## kaku 쪽 권장 설정
+Things the design is careful about:
 
-탭 점은 `bell_tab_indicator` 로 기본 활성이라 따로 켤 것이 없다. 다만 **Dock 배지는
-기본이 꺼져 있다.** kaku 를 다른 앱 뒤로 보내 두었을 때도 몇 건이 밀려 있는지 보려면
-`~/.config/kaku/kaku.lua` 에 한 줄을 넣는다.
+- **Identifying targets**: the child `ssh` process shares the same tty and also carries
+  `ssh://target` on its command line. Only processes whose `argv[0]` is `herdr` and whose
+  `argv[1]` is `--remote` are counted. The target value is passed through untouched, since
+  herdr hands it straight to `ssh` — config aliases, `user@host`, `ssh://` URIs and ports
+  all arrive here.
+- **JSON**: the `agent list` response is read with a parser. Agent titles contain whatever
+  prompt the user typed, so scraping braces and quotes as text breaks.
+- **Failed lookups**: not treated as "nothing there". The previous state is kept, so a
+  network drop and reconnect does not produce a phantom alert.
+- **First cycle**: records state without ringing. Starting the watcher does not set off
+  every agent that was already waiting.
+- **Parallel lookups**: one thread per session. One slow host timing out does not delay the
+  cycle.
+- **Resilience**: a failed cycle is logged and the loop continues. The watcher dying
+  silently would mean alerts simply stop arriving with no way to notice.
+
+The target list is rebuilt from `ps` every cycle, so it follows reconnects that change the
+tty and sessions that come and go. Remote lookups reuse connections through ssh
+`ControlMaster`.
+
+## Recommended kaku settings
+
+The tab dot needs nothing — `bell_tab_indicator` is on by default. The **Dock badge is off
+by default**, though. To see how many are pending while kaku sits behind other apps, add one
+line to `~/.config/kaku/kaku.lua`:
 
 ```lua
 config.bell_dock_badge = true
 ```
 
-kaku 문서에는 나오지 않는 설정이라 모르고 지나치기 쉽다. 배지는 kaku 창이 포커스를
-받거나 탭을 전환하면 지워진다.
+It is easy to miss because it is not in kaku's documentation. The badge clears when the kaku
+window takes focus or you switch tabs.
 
-## herdr 쪽 권장 설정
+## Recommended herdr settings
 
-이 플러그인은 탭 표식만 담당한다. 표식은 어느 세션인지까지만 알려주므로, 무슨 일인지
-알려면 herdr 의 알림을 함께 켠다. `blocked` 는 `claude needs attention`, `done` 은
-`claude finished` 로 구분해서 띄운다.
+This plugin only handles the tab indicator, which tells you *which* session. To learn *what*
+happened, turn on herdr's notifications as well. They distinguish `blocked` as
+`claude needs attention` from `done` as `claude finished`.
 
 ```toml
 [ui.toast]
 delivery = "terminal"
 ```
 
-**kaku 에서는 여기에 한 가지가 더 필요하다.** herdr 는 `TERM_PROGRAM` 과 `TERM` 으로
-바깥 터미널을 판별해 알림 시퀀스를 고르는데, kaku 는 WezTerm 포크이면서도 자기 이름으로
-정체를 알리기 때문에(`TERM_PROGRAM=Kaku`, `TERM=xterm-256color`) 어느 갈래에도 걸리지
-않는다. 그러면 herdr 는 아무 시퀀스도 내보내지 않으면서 `shown: true` 를 돌려준다.
-응답만 보고 동작한다고 판단하면 안 된다.
+**On kaku this alone is not enough.** herdr picks the notification sequence by inspecting
+`TERM_PROGRAM` and `TERM`. kaku is a WezTerm fork but announces itself under its own name
+(`TERM_PROGRAM=Kaku`, `TERM=xterm-256color`), so it matches no branch. herdr then emits no
+sequence at all while still returning `shown: true` — do not take the response as proof that
+anything was displayed.
 ([herdrdev/herdr#2513](https://github.com/herdrdev/herdr/issues/2513))
 
-kaku 는 OSC 9 를 읽으므로, herdr 에게 WezTerm 계열이라고 알리면 실제 능력과 일치한다.
-herdr 를 띄울 때만 걸어서 영향을 그 프로세스에 가둔다.
+kaku does read OSC 9, so telling herdr it belongs to the WezTerm family matches its actual
+capability. Scope it to herdr so nothing else is affected:
 
 ```sh
 # ~/.zshrc.local
 herdr() { TERM_PROGRAM=WezTerm command herdr "$@"; }
 ```
 
-환경변수는 프로세스가 시작할 때 읽히므로, 이미 떠 있는 클라이언트는 다시 띄워야 한다.
-`herdr --remote` 로 여러 서버에 붙어 있다면 탭마다 해야 한다.
+Environment variables are read at process start, so clients that are already running must be
+restarted. With `herdr --remote` across several servers, that means every tab.
 
-이 방법을 쓰면 알림이 kaku 아이콘으로 뜨는 대신, OSC 9 규격상 제목과 본문이 한 줄로
-합쳐진다. 알림 제목 자리에는 `Kaku` 가 들어가고 `claude needs attention: ~ · 1` 이
-본문이 된다. 제목에서 상태를 바로 읽고 싶으면 `delivery = "system"` 을 쓴다 — 그쪽은
-`osascript` 를 거치므로 알림이 "스크립트 편집기" 이름으로 뜬다.
+The trade-off: notifications now carry the kaku icon, but OSC 9 takes a single body string,
+so title and body are joined into one line. The notification title becomes `Kaku` and the
+body reads `claude needs attention: ~ · 1`. If you would rather read the state straight from
+the title, use `delivery = "system"` — that path goes through `osascript`, so notifications
+appear under the name "Script Editor".
 
-## 설정
+## Configuration
 
-| 환경변수 | 기본값 | 뜻 |
+| Environment variable | Default | Meaning |
 |---|---|---|
-| `HERDR_KAKU_BELL_INTERVAL` | `1` | 폴링 주기(초). 소수도 받는다 |
+| `HERDR_KAKU_BELL_INTERVAL` | `1` | polling interval in seconds; fractions accepted |
 
-세션 일곱 개를 병렬로 조회하는 데 0.2초쯤 걸린다. 주기를 줄여도 부담이 크지 않아
-`0.5` 까지 내려도 동작하지만, 서버가 많거나 회선이 느리면 조회가 주기를 넘어선다.
-그때는 다음 주기가 그만큼 밀릴 뿐 망가지지는 않는다.
+Querying seven sessions in parallel takes about 0.2 seconds, so a shorter interval costs
+little — `0.5` works. With many servers or a slow link the lookup can exceed the interval;
+the next cycle is simply delayed, nothing breaks.
 
-상태와 로그는 `/tmp/herdr-kaku-bell/` 에 있다. `watch.log` 에 ssh 오류가 쌓인다.
+State and logs live in `/tmp/herdr-kaku-bell/`. ssh errors accumulate in `watch.log`.
 
-## 한계
+## Limitations
 
-- 폴링이다. herdr 0.8.2 는 플러그인 이벤트 훅(`pane.agent_status_changed`)을 실제로
-  호출하지 않는다 — 매니페스트에 선언은 해 두었으니, 훅이 동작하는 버전에서는 그쪽이
-  먼저 반응한다.
-- 여러 herdr 세션(`--session`)은 지원하지 않는다. 기본 세션과 `--remote` 만 센다.
-- `done` 은 "안 본 배경 작업이 끝난 상태"라, 탭을 열면 herdr 쪽에서 `idle` 로 바뀐다.
-  감시 주기와 겹치면 한 박자 늦게 울릴 수 있다.
-- macOS 전용이다. `ps -axo tty=` 출력과 `/dev/ttysNNN` 쓰기에 기댄다.
-- kaku 외의 터미널에서는 탭 표식이 뜨지 않는다. BEL 을 어떻게 다루는지는 터미널마다
-  다르다. WezTerm 계열이면 비슷하게 동작할 여지가 있으나 확인하지 않았다.
+- It polls. herdr 0.8.2 does not actually invoke the plugin event hook
+  (`pane.agent_status_changed`) — the manifest declares it anyway, so on a version where the
+  hook fires it will respond first.
+- Multiple herdr sessions (`--session`) are not supported. Only the default session and
+  `--remote` are counted.
+- `done` means "unseen background work finished", so herdr flips it to `idle` once you open
+  the tab. When that races the polling cycle, the ring can arrive a beat late.
+- macOS only. It relies on `ps -axo tty=` output and writing to `/dev/ttysNNN`.
+- No tab indicator outside kaku. How a terminal treats a BEL varies; other WezTerm-family
+  terminals may behave similarly, but this has not been verified.
+
+## License
+
+MIT
